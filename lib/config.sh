@@ -130,7 +130,10 @@ read_profile_section() {
         done < <(sed -n "/^\[$section\]/,/^\[/p" "$profile_file" | tail -n +2 | grep -v '^\[')
     fi
 
-    printf '%s\n' "${result[@]}"
+    # Only print if array has elements
+    if [[ ${#result[@]} -gt 0 ]]; then
+        printf '%s\n' "${result[@]}"
+    fi
 }
 
 update_profile_section() {
@@ -185,8 +188,11 @@ get_current_profiles() {
             [[ -n "$line" ]] && current_profiles+=("$line")
         done < <(read_profile_section "$profiles_file" "profiles")
     fi
-    
-    printf '%s\n' "${current_profiles[@]}"
+
+    # Only print if array has elements
+    if [[ ${#current_profiles[@]} -gt 0 ]]; then
+        printf '%s\n' "${current_profiles[@]}"
+    fi
 }
 
 # -------- Profile installation functions for Docker builds -------------------

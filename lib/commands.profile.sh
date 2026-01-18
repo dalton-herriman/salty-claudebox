@@ -32,12 +32,14 @@ _cmd_profiles() {
         local desc=$(get_profile_description "$profile")
         local is_enabled=false
         # Check if profile is currently enabled
-        for enabled in "${current_profiles[@]}"; do
-            if [[ "$enabled" == "$profile" ]]; then
-                is_enabled=true
-                break
-            fi
-        done
+        if [[ ${#current_profiles[@]} -gt 0 ]]; then
+            for enabled in "${current_profiles[@]}"; do
+                if [[ "$enabled" == "$profile" ]]; then
+                    is_enabled=true
+                    break
+                fi
+            done
+        fi
         printf "  ${GREEN}%-15s${NC} " "$profile"
         if [[ "$is_enabled" == "true" ]]; then
             printf "${GREEN}✓${NC} "

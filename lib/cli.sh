@@ -20,18 +20,27 @@ readonly SCRIPT_COMMANDS=(shell create slot slots revoke profiles projects profi
 #   pass_through: Array of args to pass to Claude in container
 # Note: Each argument goes into exactly ONE bucket - no duplication
 parse_cli_args() {
-    local all_args=("$@")
-    
-    # Initialize bucket arrays
+    # Initialize bucket arrays (local)
     host_flags=()
     control_flags=()
     script_command=""
     pass_through=()
-    
+
+    # Initialize global CLI variables (must be set even if no args)
+    CLI_HOST_FLAGS=()
+    CLI_CONTROL_FLAGS=()
+    CLI_SCRIPT_COMMAND=""
+    CLI_PASS_THROUGH=()
+
+    # Early return if no arguments
+    if [[ $# -eq 0 ]]; then
+        return 0
+    fi
+
     # Single parsing loop - each arg goes into exactly ONE bucket
     local found_script_command=false
-    
-    for arg in "${all_args[@]}"; do
+
+    for arg in "$@"; do
         if [[ " ${HOST_ONLY_FLAGS[*]} " == *" $arg "* ]]; then
             # Bucket 1: Host-only flags
             host_flags+=("$arg")
@@ -49,14 +58,20 @@ parse_cli_args() {
     done
     
     # Export results for use by main script
-    export CLI_HOST_FLAGS=("${host_flags[@]}")
-    export CLI_CONTROL_FLAGS=("${control_flags[@]}")
-    export CLI_SCRIPT_COMMAND="$script_command"
-    export CLI_PASS_THROUGH=("${pass_through[@]}")
+    # Arrays are always initialized above, so "${arr[@]}" is safe with set -u
+    CLI_HOST_FLAGS=("${host_flags[@]}")
+    CLI_CONTROL_FLAGS=("${control_flags[@]}")
+    CLI_SCRIPT_COMMAND="$script_command"
+    CLI_PASS_THROUGH=("${pass_through[@]}")
 }
 
 # Process host-only flags and set environment variables
 process_host_flags() {
+    # Handle empty array with set -u
+    if [[ ${#CLI_HOST_FLAGS[@]} -eq 0 ]]; then
+        return 0
+    fi
+
     for flag in "${CLI_HOST_FLAGS[@]}"; do
         case "$flag" in
             --verbose)
@@ -125,11 +140,11 @@ requires_slot() {
 # Debug output for parsed arguments (only if VERBOSE=true)
 debug_parsed_args() {
     if [[ "${VERBOSE:-false}" == "true" ]]; then
-        echo "[DEBUG] CLI Parser Results:" >&2
-        echo "[DEBUG]   Host flags: ${CLI_HOST_FLAGS[*]}" >&2
-        echo "[DEBUG]   Control flags: ${CLI_CONTROL_FLAGS[*]}" >&2
-        echo "[DEBUG]   Script command: ${CLI_SCRIPT_COMMAND}" >&2
-        echo "[DEBUG]   Pass-through: ${CLI_PASS_THROUGH[*]}" >&2
+        printf '[DEBUG] CLI Parser Results:\n' >&2
+        printf '[DEBUG]   Host flags: %s\n' "${CLI_HOST_FLAGS[*]}" >&2
+        printf '[DEBUG]   Control flags: %s\n' "${CLI_CONTROL_FLAGS[*]}" >&2
+        printf '[DEBUG]   Script command: %s\n' "${CLI_SCRIPT_COMMAND}" >&2
+        printf '[DEBUG]   Pass-through: %s\n' "${CLI_PASS_THROUGH[*]}" >&2
     fi
 }
 

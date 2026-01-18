@@ -109,6 +109,7 @@ main() {
                 if [[ ${#saved_flags[@]} -gt 0 ]]; then
                     # Re-parse WITH saved flags, but the command structure is preserved
                     # because the command was already identified from original args
+                    # original_args is always initialized on line 79, so "${arr[@]}" is safe
                     parse_cli_args "${original_args[@]}" "${saved_flags[@]}"
                     process_host_flags
                     
@@ -137,6 +138,7 @@ main() {
     # If command doesn't need Docker, skip all Docker setup
     if [[ "$cmd_requirements" == "none" ]]; then
         # Dispatch the command directly and exit
+        # CLI arrays are always initialized by parse_cli_args, so "${arr[@]}" is safe
         dispatch_command "${CLI_SCRIPT_COMMAND}" "${CLI_PASS_THROUGH[@]}" "${CLI_CONTROL_FLAGS[@]}"
         exit $?
     fi
@@ -352,7 +354,8 @@ main() {
                 # Separate Python-only profiles from Docker-affecting profiles
                 local docker_profiles=()
                 local python_only_profiles=("python" "ml" "datascience")
-                
+
+                if [[ ${#current_profiles[@]} -gt 0 ]]; then
                 for profile in "${current_profiles[@]}"; do
                     local is_python_only=false
                     for py_profile in "${python_only_profiles[@]}"; do
@@ -365,7 +368,8 @@ main() {
                         docker_profiles+=("$profile")
                     fi
                 done
-                
+                fi
+
                 # Calculate hash only for Docker-affecting profiles
                 local docker_profiles_hash=""
                 if [[ ${#docker_profiles[@]} -gt 0 ]]; then
@@ -455,9 +459,14 @@ main() {
                 
                 # Re-parse all arguments with saved flags included
                 if [[ ${#saved_flags[@]} -gt 0 ]]; then
-                    # Combine original args with saved flags
-                    local all_args=("${original_args[@]}" "${saved_flags[@]}")
-                    
+                    # Combine original args with saved flags using append pattern
+                    # to preserve argument boundaries safely
+                    local all_args=()
+                    if [[ ${#original_args[@]} -gt 0 ]]; then
+                        all_args+=("${original_args[@]}")
+                    fi
+                    all_args+=("${saved_flags[@]}")
+
                     # Re-parse to properly sort flags
                     parse_cli_args "${all_args[@]}"
                     process_host_flags
@@ -472,12 +481,14 @@ main() {
             # Check if stdin is not a terminal (i.e., we're receiving piped input)
             # and -p/--print flag isn't already present
             local has_print_flag=false
-            for arg in "${CLI_PASS_THROUGH[@]}"; do
-                if [[ "$arg" == "-p" ]] || [[ "$arg" == "--print" ]]; then
-                    has_print_flag=true
-                    break
-                fi
-            done
+            if [[ ${#CLI_PASS_THROUGH[@]} -gt 0 ]]; then
+                for arg in "${CLI_PASS_THROUGH[@]}"; do
+                    if [[ "$arg" == "-p" ]] || [[ "$arg" == "--print" ]]; then
+                        has_print_flag=true
+                        break
+                    fi
+                done
+            fi
             
             if [[ "$VERBOSE" == "true" ]]; then
                 if [[ -t 0 ]]; then
@@ -535,35 +546,39 @@ build_docker_image() {
         while IFS= read -r line; do
             [[ -n "$line" ]] && current_profiles+=("$line")
         done < <(read_profile_section "$profiles_file" "profiles")
-        
+
         # Generate profile installations
-        for profile in "${current_profiles[@]}"; do
-            profile=$(echo "$profile" | tr -d '[:space:]')
-            [[ -z "$profile" ]] && continue
-            
-            # Convert hyphens to underscores for function names
-            local profile_fn="get_profile_${profile//-/_}"
-            if type -t "$profile_fn" >/dev/null; then
-                profile_installations+=$'\n'"$($profile_fn)"
-            fi
-        done
-        
+        if [[ ${#current_profiles[@]} -gt 0 ]]; then
+            for profile in "${current_profiles[@]}"; do
+                profile=$(echo "$profile" | tr -d '[:space:]')
+                [[ -z "$profile" ]] && continue
+
+                # Convert hyphens to underscores for function names
+                local profile_fn="get_profile_${profile//-/_}"
+                if type -t "$profile_fn" >/dev/null; then
+                    profile_installations+=$'\n'"$($profile_fn)"
+                fi
+            done
+        fi
+
         # Calculate hash only for Docker-affecting profiles
         local docker_profiles=()
         local python_only_profiles=("python" "ml" "datascience")
-        
-        for profile in "${current_profiles[@]}"; do
-            local is_python_only=false
-            for py_profile in "${python_only_profiles[@]}"; do
-                if [[ "$profile" == "$py_profile" ]]; then
-                    is_python_only=true
-                    break
+
+        if [[ ${#current_profiles[@]} -gt 0 ]]; then
+            for profile in "${current_profiles[@]}"; do
+                local is_python_only=false
+                for py_profile in "${python_only_profiles[@]}"; do
+                    if [[ "$profile" == "$py_profile" ]]; then
+                        is_python_only=true
+                        break
+                    fi
+                done
+                if [[ "$is_python_only" == "false" ]]; then
+                    docker_profiles+=("$profile")
                 fi
             done
-            if [[ "$is_python_only" == "false" ]]; then
-                docker_profiles+=("$profile")
-            fi
-        done
+        fi
         
         if [[ ${#docker_profiles[@]} -gt 0 ]]; then
             profile_hash=$(printf '%s\n' "${docker_profiles[@]}" | sort | cksum | cut -d' ' -f1)
