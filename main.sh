@@ -585,23 +585,22 @@ LABEL claudebox.profiles=\"$profile_hash\"
 LABEL claudebox.profiles.crc=\"$profiles_file_hash\"
 LABEL claudebox.project=\"$project_folder_name\""
     
-    # Replace placeholders in the project template
-    local final_dockerfile="$base_dockerfile"
-    
-    # Replace WHOLE lines that contain the placeholders (with optional spaces)
+    # Replace WHOLE lines that contain the placeholders (with optional spaces).
+    # PI= and LBS= inline env vars are required — awk ENVIRON reads from the
+    # process environment, avoiding awk -v which cannot handle literal newlines
+    # or & characters in multi-line profile installation strings.
     local final_dockerfile
-    final_dockerfile=$(awk -v pi="$profile_installations" -v lbs="$labels" '
-    # If the whole line is {{ PROFILE_INSTALLATIONS }}, print injected block and skip
-    /^[[:space:]]*\{\{[[:space:]]*PROFILE_INSTALLATIONS[[:space:]]*\}\}[[:space:]]*$/ { print pi; next }
-    # If the whole line is {{ LABELS }}, print labels block and skip
-    /^[[:space:]]*\{\{[[:space:]]*LABELS[[:space:]]*\}\}[[:space:]]*$/ { print lbs; next }
-    # Otherwise, print the line unchanged
+    final_dockerfile=$(PI="$profile_installations" LBS="$labels" awk '
+    /^[[:space:]]*\{\{[[:space:]]*PROFILE_INSTALLATIONS[[:space:]]*\}\}[[:space:]]*$/ { print ENVIRON["PI"]; next }
+    /^[[:space:]]*\{\{[[:space:]]*LABELS[[:space:]]*\}\}[[:space:]]*$/ { print ENVIRON["LBS"]; next }
     { print }
     ' <<<"$base_dockerfile") || error "Failed to apply Dockerfile substitutions"
 
-    # Guard: ensure no unreplaced placeholders remain
-    if grep -q '{{PROFILE_INSTALLATIONS}}' <<<"$final_dockerfile" grep -q '{{LABELS}}' <<<"$final_dockerfile"; then
-    error "Unreplaced placeholders remain in generated Dockerfile"
+    # Guard: ensure no unreplaced placeholders remain (match with optional
+    # whitespace inside braces, consistent with the awk patterns above)
+    if grep -qE '\{\{[[:space:]]*PROFILE_INSTALLATIONS[[:space:]]*\}\}' <<<"$final_dockerfile" \
+    || grep -qE '\{\{[[:space:]]*LABELS[[:space:]]*\}\}' <<<"$final_dockerfile"; then
+        error "Unreplaced placeholders remain in generated Dockerfile"
     fi
 
     printf '%s' "$final_dockerfile" > "$dockerfile"
