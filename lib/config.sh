@@ -271,7 +271,7 @@ EOF
 
 get_profile_javascript() {
     cat << 'EOF'
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
 ENV NVM_DIR="/home/claude/.nvm"
 RUN . $NVM_DIR/nvm.sh && nvm install --lts
 USER claude

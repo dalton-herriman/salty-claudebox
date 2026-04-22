@@ -38,7 +38,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
 USER $USERNAME
 WORKDIR /home/$USERNAME
 
-RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.0/zsh-in-docker.sh)" -- \
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.2.1/zsh-in-docker.sh)" -- \
     -p git \
     -p fzf \
     -a "source /usr/share/doc/fzf/examples/key-bindings.zsh" \
@@ -73,7 +73,7 @@ ENV DEVCONTAINER=true
 ENV SHELL=/bin/zsh
 
 ENV NVM_DIR="/home/$USERNAME/.nvm"
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
 
 RUN bash -c "source $NVM_DIR/nvm.sh && \
     if [[ \"$NODE_VERSION\" == '--lts' ]]; then \
